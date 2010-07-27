@@ -9,14 +9,20 @@ import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+
 
 /**
  * <tt>WebSocketServer</tt> is an abstract class that only takes care of the
  * HTTP handshake portion of WebSockets. It's up to a subclass to add
  * functionality/purpose to the server.
+ * 
+ * May be configured to listen to listen on a specified
+ * <var>port</var> using a specified <var>subprotocol</var>.
+ * May also be configured to only allows connections from a specified <var>origin</var>.
+ * Can be configure to support a specific <var>draft</var> of the WebSocket protocol
+ * (DRAFT75 or DRAFT76) or both (AUTO).
  * @author Nathan Rajlich
  */
 public abstract class WebSocketServer implements Runnable, WebSocketListener {
@@ -27,46 +33,183 @@ public abstract class WebSocketServer implements Runnable, WebSocketListener {
      */
     public static final int DEFAULT_PORT = 80;
     /**
+     * If a constructor is used that doesn't define the draft, the DEFAULT_DRAFT
+     *  will be the draft of the WebSocket protocl the WebSocketServer supports.
+     */
+    public static final Draft DEFAULT_DRAFT = Draft.AUTO;    
+    /**
      * The value of <var>handshake</var> when a Flash client requests a policy
      * file on this server.
      */
     public static final String FLASH_POLICY_REQUEST = "<policy-file-request/>\0";
-
-    public static final Long MAX_KEY_VALUE = Long.parseLong("4294967295");
-    
+     
     // INSTANCE PROPERTIES /////////////////////////////////////////////////////
     /**
      * Holds the list of active WebSocket connections. "Active" means WebSocket
      * handshake is complete and socket can be written to, or read from.
      */
-    private final CopyOnWriteArraySet<WebSocket> connections;
+    private final CopyOnWriteArraySet<WebSocket> connections;     
+    /**
+     * The version of the WebSocket Internet-Draft this client supports.
+     */
+    private Draft draft;
+    /**
+     * The origin this WebSocket server will accept connections from.
+     */
+    private String origin;
     /**
      * The port number that this WebSocket server should listen on. Default is
      * 80 (HTTP).
      */
-    private int port;
+    private int port;       
     /**
      * The socket channel for this WebSocket server.
      */
     private ServerSocketChannel server;
+    /**
+     * The subprotocol that this WebSocket server supports. Default is null.
+     */
+    private String subprotocol; 
 
     // CONSTRUCTOR /////////////////////////////////////////////////////////////
     /**
      * Nullary constructor. Creates a WebSocketServer that will attempt to
-     * listen on port DEFAULT_PORT.
+     * listen on port DEFAULT_PORT and support both draft 75 and 76 of the
+     * WebSocket protocol.
      */
     public WebSocketServer() {
-        this(DEFAULT_PORT);
+        this(DEFAULT_PORT,null,null,DEFAULT_DRAFT);
     }
-
+    
     /**
      * Creates a WebSocketServer that will attempt to listen on port
      * <var>port</var>.
      * @param port The port number this server should listen on.
      */
     public WebSocketServer(int port) {
-        this.connections = new CopyOnWriteArraySet<WebSocket>();
-        setPort(port);
+        this(port,null,null,DEFAULT_DRAFT);
+    }
+    
+    /**
+     * Creates a WebSocketServer that will attempt to listen on port
+     * <var>port</var>. Only allows connections from <var>origin</var>.
+     * @param port The port number this server should listen on.
+     * @param origin The origin this server supports.
+     */
+    public WebSocketServer(int port, String origin) {
+        this(port,origin,null,DEFAULT_DRAFT);
+    }
+    
+    /**
+     * Creates a WebSocketServer that will attempt to listen on port
+     * <var>port</var> using a specified <var>subprotocol</var>.
+     * Only allows connections from <var>origin</var>.
+     * @param port The port number this server should listen on.
+     * @param origin The origin this server supports.
+     * @param subprotocol The subprotocol this server supports.
+     */
+    public WebSocketServer(int port, String origin, String subprotocol) {
+        this(port,origin,subprotocol,DEFAULT_DRAFT);
+    }
+    
+    /**
+     * Creates a WebSocketServer that will attempt to listen on port
+     * <var>port</var> using a specified <var>subprotocol</var>.
+     * Only allows connections from <var>origin</var> using specified
+     * <var>draft</var> of the WebSocket protocol.
+     * @param port The port number this server should listen on.
+     * @param origin The origin this server supports.
+     * @param subprotocol The subprotocol this server supports.
+     * @param draft The draft of the WebSocket protocol this server supports.
+     */
+    public WebSocketServer(int port, String origin, String subprotocol, String draft) {
+        this(port,origin,subprotocol,Draft.valueOf(draft));
+    }
+    
+    /**
+     * Creates a WebSocketServer that will attempt to listen on port
+     * <var>port</var> using a specified <var>subprotocol</var>.
+     * Only allows connections from <var>origin</var> using specified
+     * <var>draft</var> of the WebSocket protocol.
+     * @param port The port number this server should listen on.
+     * @param origin The origin this server supports.
+     * @param subprotocol The subprotocol this server supports.
+     * @param draft The draft of the WebSocket protocol this server supports.
+     */
+    public WebSocketServer(int port, String origin, String subprotocol, Draft draft) {
+         this.connections = new CopyOnWriteArraySet<WebSocket>();
+         setPort(port);
+         setOrigin(origin);
+         setSubProtocol(subprotocol);
+         setDraft(draft);
+    }
+    
+    
+    // PUBLIC INSTANCE METHODS /////////////////////////////////////////////////
+    /**
+     * Sets this WebSocketClient draft.
+     * @param draft
+     */
+    public void setDraft(Draft draft) {
+        this.draft = draft;
+    }
+    
+    /**
+     * Gets the draft that this WebSocketClient supports.
+     * @return The draft for this WebSocketClient.
+     */
+    public Draft getDraft() {
+        return draft;
+    }
+    
+    /**
+     * Sets the origin that this WebSocketServer should allow connections
+     * from.
+     * @param origin The origin to allow connections from.
+     */
+    public void setOrigin(String origin) {
+        this.origin = origin;
+    }
+    
+    /**
+     * Gets the origin that this WebSocketServer should allow connections
+     * from.
+     * @return The origin.
+     */
+    public String getOrigin() {
+        return origin;
+    }
+    
+    /**
+     * Sets the port that this WebSocketServer should listen on.
+     * @param port The port number to listen on.
+     */
+    public void setPort(int port) {
+        this.port = port;
+    }
+    
+    /**
+     * Gets the port number that this server listens on.
+     * @return The port number.
+     */
+    public int getPort() {
+        return port;
+    }
+    
+    /**
+     * Sets this WebSocketClient subprotocol.
+     * @param subprotocol
+     */
+    public void setSubProtocol(String subprotocol) {
+        this.subprotocol = subprotocol;
+    }
+    
+    /**
+     * Gets the subprotocol that this WebSocketClient supports.
+     * @return The subprotocol for this WebSocketClient.
+     */
+    public String getSubProtocol() {
+        return subprotocol;
     }
 
     /**
@@ -135,23 +278,7 @@ public abstract class WebSocketServer implements Runnable, WebSocketListener {
         return this.connections.toArray(new WebSocket[0]);
     }
 
-    /**
-     * Sets the port that this WebSocketServer should listen on.
-     * @param port The port number to listen on.
-     */
-    public void setPort(int port) {
-        this.port = port;
-    }
 
-    /**
-     * Gets the port number that this server listens on.
-     * @return The port number.
-     */
-    public int getPort() {
-        return port;
-    }
-
-    
     // Runnable IMPLEMENTATION /////////////////////////////////////////////////
     public void run() {
         try {
@@ -178,7 +305,7 @@ public abstract class WebSocketServer implements Runnable, WebSocketListener {
                     if (key.isAcceptable()) {
                         SocketChannel client = server.accept();
                         client.configureBlocking(false);
-                        WebSocket c = new WebSocket(client, this);
+                        WebSocket c = new WebSocket(client, this, ClientServerType.SERVER);
                         client.register(selector, SelectionKey.OP_READ, c);
                     }
 
@@ -228,329 +355,188 @@ public abstract class WebSocketServer implements Runnable, WebSocketListener {
      *         successfully sent a WebSocket server handshake, false otherwise.
      * @throws IOException When socket related I/O errors occur.
      */
-    public boolean onHandshakeRecieved(WebSocket conn, String handshake) throws IOException {
-        if (FLASH_POLICY_REQUEST.equals(handshake)) {
+    public boolean onHandshakeRecieved(WebSocket conn, WebSocketHandshake handshake) throws IOException {
+        if (FLASH_POLICY_REQUEST.equals(handshake.toString())) {
             String policy = getFlashSecurityPolicy() + "\0";
-            conn.socketChannel().write(ByteBuffer.wrap(policy.getBytes(WebSocket.UTF8_CHARSET)));
+            conn.socketChannel().write(ByteBuffer.wrap(policy.getBytes(UTF8_CHARSET)));
             return false;
         }
         
-        String[] requestLines = handshake.split("\r\n");        
-        String line;
-        
-        Properties p = new Properties();
-        for (int i=1; i<requestLines.length; i++) {
-            line = requestLines[i];
-            if (line.length() == 0) {
-            	break;
-            }
-            int firstColon = line.indexOf(":");
-            p.setProperty(line.substring(0, firstColon).trim().toLowerCase(), line.substring(firstColon+1).trim());
+        if (handshake.getDraft() == Draft.DRAFT75 && (this.draft == Draft.AUTO || this.draft == Draft.DRAFT75)) {
+            return handleHandshake75(conn,handshake);
+        } else if (handshake.getDraft() == Draft.DRAFT76 && (this.draft == Draft.AUTO || this.draft == Draft.DRAFT76)) {
+            return handleHandshake76(conn,handshake);
         }
         
-        int version = p.containsKey("sec-websocket-key1") ? 76 : 75;
-        
-        if (version == 75) {
-            return handleHandshake75(conn,p,requestLines);
-        } else {
-            return handleHandshake76(conn,p,requestLines);
-        }
-        
+        // If we get here we got a handshake that is incompatibile with the server.
+        return false;
     }
 
-    private boolean handleHandshake75(WebSocket conn, Properties p, String[] requestLines) throws IOException {
-    	
-     	String line = requestLines[0].trim();
-        String path = null;
+    private boolean handleHandshake75(WebSocket conn, WebSocketHandshake handshake) throws IOException {
         
-        if (!(line.startsWith("GET") && line.endsWith("HTTP/1.1"))) {
+        if (!handshake.getProperty("Method").equals("GET")
+                || !handshake.getProperty("HTTP-Version").equals("HTTP/1.1")
+                    || !handshake.getProperty("Request-URI").startsWith("/")) {
             return false;
-        } else {
-            String[] firstLineTokens = line.split(" ");
-            path = firstLineTokens[1];
         }
         
-        String prop = p.getProperty("upgrade");
+        String prop = handshake.getProperty("Upgrade");
         if (prop == null || !prop.equals("WebSocket")) {
             return false;
         }
-        prop = p.getProperty("connection");
+        
+        prop = handshake.getProperty("Connection");
         if (prop == null || !prop.equals("Upgrade")) {
             return false;
         }
-
+        
+        if (subprotocol != null) {
+            prop = handshake.getProperty("Websocket-Protocol");
+            if (prop == null || !prop.equals(subprotocol)) {
+                return false;
+            }
+        }
+        
+        if (origin != null) {
+            prop = handshake.getProperty("Origin");
+            if (prop == null || !prop.startsWith(origin)) {
+                return false;
+            }
+        }
+        
         // If we've determined that this is a valid WebSocket request, send a
         // valid WebSocket server handshake, then return true to keep connection alive.
         
-        String responseHandshake = "HTTP/1.1 101 Web Socket Protocol Handshake\r\n" +
-                                   "Upgrade: WebSocket\r\n" +
-                                   "Connection: Upgrade\r\n" +
-                                   "WebSocket-Origin: " + p.getProperty("origin") + "\r\n" +
-                                   "WebSocket-Location: ws://" + p.getProperty("host") + path + "\r\n";
-        if (p.containsKey("WebSocket-Protocol")) {
-            responseHandshake +=   "WebSocket-Protocol: " + p.getProperty("websocket-protocol") + "\r\n";
+        WebSocketHandshake serverHandshake = new WebSocketHandshake();
+        serverHandshake.setType(ClientServerType.SERVER);
+        serverHandshake.setDraft(Draft.DRAFT75);
+        serverHandshake.put("Host", handshake.getProperty("Host"));
+        serverHandshake.put("Request-URI", handshake.getProperty("Request-URI"));
+        serverHandshake.put("Origin", handshake.getProperty("Origin"));
+        if (handshake.containsKey("Websocket-Protocol")) {
+            serverHandshake.put("Websocket-Protocol", handshake.getProperty("Websocket-Protocol"));
         }
-        responseHandshake += "\r\n"; // Signifies end of handshake
-        conn.socketChannel().write(ByteBuffer.wrap(responseHandshake.getBytes(WebSocket.UTF8_CHARSET)));
+        
+        conn.socketChannel().write(ByteBuffer.wrap(serverHandshake.getHandshake()));
+        
         return true;
         
     }
     
-    private boolean handleHandshake76(WebSocket conn, Properties p, String[] requestLines) throws IOException {
-    	
-    	String line = requestLines[0].trim();
-        String path = null;        
+    private boolean handleHandshake76(WebSocket conn, WebSocketHandshake handshake) throws IOException {
         
-        // 6.1.  Reading the client's opening handshake
-
-        // 6.1.1. The three-character UTF-8 string "GET".
-        // 6.2.1. A UTF-8-encoded U+0020 SPACE character (0x20 byte).
-        if (!line.startsWith("GET ")) {
+        if (!handshake.getProperty("method").equals("GET")
+                || !handshake.getProperty("request-uri").matches("^/[\u0021-\u007E]*")) {
             return false;
-        } else {
-            // 6.1.3.  A string consisting of all the bytes up to the next UTF-8-encoded
-        	// U+0020 SPACE character (0x20 byte).  The result of decoding this
-        	// string as a UTF-8 string is the name of the resource requested by
-        	// the server.  If the server only supports one resource, then this
-        	// can safely be ignored; the client verifies that the right
-        	// resource is supported based on the information included in the
-        	// server's own handshake.  The resource name will begin with U+002F
-        	// SOLIDUS character (/) and will only include characters in the
-        	// range U+0021 to U+007E.
-        	String[] firstLineTokens = line.split(" ");
-            path = firstLineTokens[1];
-            if (!path.matches("^/[\u0021-\u007E]*")) {
-            	return false;
+        } 
+        
+        String prop;
+       
+        prop = handshake.getProperty("upgrade");
+        if (prop == null || !(prop.equalsIgnoreCase("WebSocket"))) {
+            return false;
+        }
+        
+        prop = handshake.getProperty("connection");
+        if (prop == null || !(prop.equalsIgnoreCase("Upgrade"))) {
+            return false;
+        }
+        
+        if (!handshake.containsKey("host")) {
+            return false;
+        }
+        
+        
+        if (!handshake.containsKey("origin")) {
+            return false;
+        } 
+        
+        if (origin != null) {
+            prop = handshake.getProperty("origin");
+            if (prop == null || !prop.startsWith(origin)) {
+                return false;
             }
         }
-        // 6.1.4. A string of bytes terminated by a UTF-8-encoded U+000D CARRIAGE
-        // RETURN U+000A LINE FEED character pair (CRLF).  All the
-        // characters from the second 0x20 byte up to the first 0x0D 0x0A
-        // byte pair in the data from the client can be safely ignored.  (It
-        // will probably be the string "HTTP/1.1".)
         
-        // 6.1.5. A series of fields.
-        // The expected field names, and the meaning of their corresponding
-        // values, are as follows.  Field names must be compared in an ASCII
-        // case-insensitive manner.
-
-        String prop;
-        /*
-	    |Upgrade|
-	       Invariant part of the handshake.  Will always have a value that is
-	       an ASCII case-insensitive match for the string "WebSocket".
-	
-	       Can be safely ignored, though the server should abort the
-	       WebSocket connection if this field is absent or has a different
-	       value, to avoid vulnerability to cross-protocol attacks.
-	    */
-        prop = p.getProperty("upgrade");
-        if (prop == null || !(prop.compareToIgnoreCase("WebSocket") == 0)) {
-            return false;
+        if (subprotocol != null) {
+            prop = handshake.getProperty("sec-websocket-protocol");
+            if (prop == null || !prop.equals(subprotocol)) {
+                return false;
+            }
         }
-	
-        /*
-	    |Connection|
-	       Invariant part of the handshake.  Will always have a value that is
-	       an ASCII case-insensitive match for the string "Upgrade".
-	
-	       Can be safely ignored, though the server should abort the
-	       WebSocket connection if this field is absent or has a different
-	       value, to avoid vulnerability to cross-protocol attacks.
-        */
-        prop = p.getProperty("connection");
-        if (prop == null || !(prop.compareToIgnoreCase("Upgrade") == 0)) {
-            return false;
-        }
-
-        /*
-        |Host|
-          The value gives the hostname that the client intended to use when
-          opening the WebSocket.  It would be of interest in particular to
-          virtual hosting environments, where one server might serve
-          multiple hosts, and might therefore want to return different data.
-
-          Can be safely ignored, though the server should abort the
-          WebSocket connection if this field is absent or has a value that
-          does not match the server's host name, to avoid vulnerability to
-          cross-protocol attacks and DNS rebinding attacks.
-        */
-        if (!p.containsKey("host")) {
-            return false;
-        }
-    
-       /*
-       |Origin|
-          The value gives the scheme, hostname, and port (if it's not the
-          default port for the given scheme) of the page that asked the
-          client to open the WebSocket.  It would be interesting if the
-          server's operator had deals with operators of other sites, since
-          the server could then decide how to respond (or indeed, _whether_
-          to respond) based on which site was requesting a connection.
-          [ORIGIN]
-    
-          Can be safely ignored, though the server should abort the
-          WebSocket connection if this field is absent or has a value that
-          does not match one of the origins the server is expecting to
-          communicate with, to avoid vulnerability to cross-protocol attacks
-          and cross-site scripting attacks.
-       */
-        if (!p.containsKey("origin")) {
+        
+        if (!handshake.containsKey("sec-websocket-key1") || !handshake.containsKey("sec-websocket-key2")) {
             return false;
         }
         
-       /*
-       |Sec-WebSocket-Protocol|
-          The value gives the names of subprotocols that the client is
-          willing to use, as a space-separated list in the order that the
-          client prefers the protocols.  It would be interesting if the
-          server supports multiple protocols or protocol versions.
-    
-          Can be safely ignored, though the server may abort the WebSocket
-          connection if the field is absent but the conventions for
-          communicating with the server are such that the field is expected;
-          and the server should abort the WebSocket connection if the field
-          does not contain a value that does matches one of the subprotocols
-          that the server supports, to avoid integrity errors once the
-          connection is established.
-       */
-        if (p.containsKey("sec-websocket-protocol")) {
-            //TODO: Confirm the server supports subprotocol
-        }
+        byte[] key3 = handshake.getAsByteArray("key3");
         
-       /*    
-       |Sec-WebSocket-Key1|
-    
-       |Sec-WebSocket-Key2|
-          The values provide the information required for computing the
-          server's handshake, as described in the next section.
-       */
-        if (!p.containsKey("sec-websocket-key1") || !p.containsKey("seb-websocket-key2")) {
-            return false;
-        }
-       
-        // 6.1.6 After the first 0x0D 0x0A 0x0D 0x0A byte sequence, indicating the
-        // end of the fields, the client sends eight random bytes.  These
-        // are used in constructing the server handshake.
-        String key3 = requestLines[requestLines.length-1];
-        
-
-        // 6.2. Sending the server's opening handshake
-        
-        // 6.2.3. Let /location/ be the string that results from constructing a
-        // WebSocket URL from /host/, /port/, /resource name/, and /secure
-        // flag/
-        String location = "ws://" + p.getProperty("host");
-        if (this.port != 80) {
-        	location += ":" + port;
-        }
-        location += "/" + path;
-        
-        // 6.2.4. Let /key-number_1/ be the digits (characters in the range U+0030
-        // DIGIT ZERO (0) to U+0039 DIGIT NINE (9)) in /key_1/, interpreted
-        // as a base ten integer, ignoring all other characters in /key_1/.
-
-        // Let /key-number_2/ be the digits (characters in the range U+0030
-        // DIGIT ZERO (0) to U+0039 DIGIT NINE (9)) in /key_2/, interpreted
-        // as a base ten integer, ignoring all other characters in /key_2/.
-
-        // If either /key-number_1/ or /key-number_2/ is greater than
-        // 4,294,967,295, then abort the WebSocket connection.  This is a
-        // symptom of an attack.
-        long key1 = Long.parseLong(p.getProperty("sec-websocket-key1").replaceAll("[^0-9]",""));
-        long key2 = Long.parseLong(p.getProperty("sec-websocket-key2").replaceAll("[^0-9]",""));
+        long key1 = Long.parseLong(handshake.getProperty("sec-websocket-key1").replaceAll("[^0-9]",""));
+        long key2 = Long.parseLong(handshake.getProperty("sec-websocket-key2").replaceAll("[^0-9]",""));
         
         if (key1 > MAX_KEY_VALUE || key2 > MAX_KEY_VALUE) {
-        	return false;
+            return false;
         }
         
-        // 6.2.5. Let /spaces_1/ be the number of U+0020 SPACE characters in
-        // /key_1/.
-
-        // Let /spaces_2/ be the number of U+0020 SPACE characters in
-        // /key_2/.
-
-        // If either /spaces_1/ or /spaces_2/ is zero, then abort the
-        // WebSocket connection.  This is a symptom of a cross-protocol
-        // attack.        
-        int spaces1 = p.getProperty("sec-websocket-key1").replaceAll("[^ ]", "").length();
-        int spaces2 = p.getProperty("sec-websocket-key2").replaceAll("[^ ]", "").length();
+        int spaces1 = handshake.getProperty("sec-websocket-key1").replaceAll("[^ ]", "").length();
+        int spaces2 = handshake.getProperty("sec-websocket-key2").replaceAll("[^ ]", "").length();
         
         if (spaces1 == 0 || spaces2 == 0) {
-        	return false;
+            return false;
         }
         
-        // 6.2.6. If /key-number_1/ is not an integral multiple of /spaces_1/,
-        // then abort the WebSocket connection.
-
-        // If /key-number_2/ is not an integral multiple of /spaces_2/,
-        // then abort the WebSocket connection.
         long mod1 = key1 % spaces1;
         long mod2 = key2 % spaces2;
         
         if (mod1 != 0 || mod2 != 0) {
-        	return false;
+            return false;
         }
-
-        // 2.6.7. Let /part_1/ be /key-number_1/ divided by /spaces_1/.
-
-        // Let /part_2/ be /key-number_2/ divided by /spaces_2/.
+        
         long part1 = key1/spaces1;
         long part2 = key2/spaces2;
-
-        // 2.6.8. Let /challenge/ be the concatenation of /part_1/, expressed as a
-        // big-endian unsigned 32-bit integer, /part_2/, expressed as a
-        // big-endian unsigned 32-bit integer, and the eight bytes of
-        // /key_3/ in the order they were sent on the wire.
-        
-        byte[] part3 = key3.getBytes();
         
         byte[] challenge = {
-        		(byte)(part1 >> 24),
-		        (byte)(part1 >> 16),
-		        (byte)(part1 >> 8),
-		        (byte)(part1 >> 0),
-		        (byte)(part2 >> 24),
-		        (byte)(part2 >> 16),
-		        (byte)(part2 >> 8),
-		        (byte)(part2 >> 0),
-		        (byte) part3[0],
-		        (byte) part3[1],
-		        (byte) part3[2],
-		        (byte) part3[3],
-		        (byte) part3[4],
-		        (byte) part3[5],
-		        (byte) part3[6],
-		        (byte) part3[7]        		
+                (byte)(part1 >> 24),
+                (byte)(part1 >> 16),
+                (byte)(part1 >> 8),
+                (byte)(part1 >> 0),
+                (byte)(part2 >> 24),
+                (byte)(part2 >> 16),
+                (byte)(part2 >> 8),
+                (byte)(part2 >> 0),
+                (byte) key3[0],
+                (byte) key3[1],
+                (byte) key3[2],
+                (byte) key3[3],
+                (byte) key3[4],
+                (byte) key3[5],
+                (byte) key3[6],
+                (byte) key3[7]
         };
         
-        // 2.6.9. Let /response/ be the MD5 fingerprint of /challenge/ as a big-
-        // endian 128 bit string.  [RFC1321]
-        
-        String response = "";
+        byte[] response;
         
         try {
-        	MessageDigest md = MessageDigest.getInstance("MD5");
-        	byte[] thedigest = md.digest(challenge);        	
-        	response = new String(thedigest,"UTF-8");        	
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            response = md.digest(challenge);            
         } catch (NoSuchAlgorithmException e) {
-        	return false;
+            return false;
         }
         
-        //2.6.10. - 2.6.13. Send the following ... to the client:
-
-        String responseHandshake = "HTTP/1.1 101 WebSocket Protocol Handshake\r\n" +
-                                   "Upgrade: WebSocket\r\n" +
-                                   "Connection: Upgrade\r\n" +
-                                   "Sec-WebSocket-Location:" + location + "\r\n" +
-                                   "Sec-WebSocket-Origin:" + p.getProperty("origin") + "\r\n";
-        if (p.containsKey("sec-websocket-protocol")) {
-        	responseHandshake +=   "Sec-WebSocket-Protocol: " + p.getProperty("sec-websocket-protocol") + "\r\n";
+        WebSocketHandshake serverHandshake = new WebSocketHandshake();
+        serverHandshake.setType(ClientServerType.SERVER);
+        serverHandshake.setDraft(Draft.DRAFT76);
+        serverHandshake.put("host", handshake.getProperty("host"));
+        serverHandshake.put("request-uri", handshake.getProperty("request-uri"));
+        serverHandshake.put("origin", handshake.getProperty("origin"));
+        serverHandshake.put("response", response);
+        if (handshake.containsKey("sec-websocket-protocol")) {
+            serverHandshake.put("sec-websocket-protocol", handshake.getProperty("sec-websocket-protocol"));
         }
-        responseHandshake += "\r\n" + response; // Signifies end of handshake
-        conn.socketChannel().write(ByteBuffer.wrap(responseHandshake.getBytes(WebSocket.UTF8_CHARSET)));
         
-        return true;        
+        conn.socketChannel().write(ByteBuffer.wrap(serverHandshake.getHandshake()));
+        
+        return true;
         
     }
     
@@ -572,4 +558,5 @@ public abstract class WebSocketServer implements Runnable, WebSocketListener {
     public abstract void onClientOpen(WebSocket conn);
     public abstract void onClientClose(WebSocket conn);
     public abstract void onClientMessage(WebSocket conn, String message);
+
 }

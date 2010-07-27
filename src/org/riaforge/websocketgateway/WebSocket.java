@@ -1,10 +1,10 @@
+// TODO: Refactor into proper class hierarchy.
 package org.riaforge.websocketgateway;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
 
 /**
  * Represents one end (client or server) of a single WebSocket connection.
@@ -16,12 +16,8 @@ import java.nio.charset.Charset;
  * by your code.
  * @author Nathan Rajlich
  */
-final class WebSocket {
-    // CONSTANTS ///////////////////////////////////////////////////////////////
-    /**
-     * The WebSocket protocol expects UTF-8 encoded bytes.
-     */
-    public static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
+public final class WebSocket implements WebSocketProtocol {
+    // CONSTANTS ///////////////////////////////////////////////////////////////    
     /**
      * The byte representing CR, or Carriage Return, or \r
      */
@@ -38,8 +34,7 @@ final class WebSocket {
      * The byte representing the end of a WebSocket text frame.
      */
     public static final byte END_OF_FRAME = (byte)0xFF;
-
-
+    
     // INSTANCE PROPERTIES /////////////////////////////////////////////////////
     /**
      * The <tt>SocketChannel</tt> instance to use for this server connection.
@@ -62,12 +57,15 @@ final class WebSocket {
     /**
      * The bytes that make up the remote handshake.
      */
-    private ByteBuffer remoteHandshake;
+    private ByteBuffer remoteHandshakeBuffer;
     /**
      * The bytes that make up the current text frame being read.
      */
     private ByteBuffer currentFrame;
-
+    /**
+     * The type of WebSocket.
+     */
+    private ClientServerType wstype;
 
     // CONSTRUCTOR /////////////////////////////////////////////////////////////
     /**
@@ -77,13 +75,15 @@ final class WebSocket {
      *                      with a Selector before construction of this object.
      * @param listener The {@link WebSocketListener} to notify of events when
      *                 they occur.
+     * @param wstype The type of WebSocket, client or server.
      */
-    public WebSocket(SocketChannel socketChannel, WebSocketListener listener) {
+    public WebSocket(SocketChannel socketChannel, WebSocketListener listener, ClientServerType wstype) {
         this.socketChannel = socketChannel;
         this.handshakeComplete = false;
-        this.remoteHandshake = this.currentFrame = null;
+        this.remoteHandshakeBuffer = this.currentFrame = null;
         this.buffer = ByteBuffer.allocate(1);
         this.wsl = listener;
+        this.wstype = wstype;
     }
 
     // PUBLIC INSTANCE METHODS /////////////////////////////////////////////////
@@ -170,38 +170,77 @@ final class WebSocket {
     }
 
     private void recieveHandshake() throws IOException {
-        ByteBuffer ch = ByteBuffer.allocate((this.remoteHandshake != null ? this.remoteHandshake.capacity() : 0) + this.buffer.capacity());
-        if (this.remoteHandshake != null) {
-            this.remoteHandshake.rewind();
-            ch.put(this.remoteHandshake);
+        ByteBuffer ch = ByteBuffer.allocate((this.remoteHandshakeBuffer != null ? this.remoteHandshakeBuffer.capacity() : 0) + this.buffer.capacity());
+        if (this.remoteHandshakeBuffer != null) {
+            this.remoteHandshakeBuffer.rewind();
+            ch.put(this.remoteHandshakeBuffer);
         }
         ch.put(this.buffer);
-        this.remoteHandshake = ch;
+        this.remoteHandshakeBuffer = ch;
+        
+        WebSocketHandshake handshake;
+        
+        byte[] h = this.remoteHandshakeBuffer.array();
+        
+        // Check to see if this is a flash policy request
+        if (h.length==23 && h[h.length-1] == 0) {
+            handshake = new WebSocketHandshake(h);
+            completeHandshake(handshake);
+            return;
+        }
 
-        // If the ByteBuffer ends with 0x0D 0x0A 0x0D 0x0A
-        // (or two CRLFs), then the client handshake is complete
-        // (version 75)
+        Draft draft;
         
-        // If the ByteBuffer ends with 0x0D 0x0A 0x0D 0x0A
-        // followed by 8 random bytes, then the client
-        // handshake is complete (version 76)
+        String hsString = new String(this.remoteHandshakeBuffer.array(), UTF8_CHARSET);
+        if (hsString.toLowerCase().contains("\r\nsec-")){
+            draft = Draft.DRAFT76;
+        } else {
+            draft = Draft.DRAFT75;
+        }
+                
+        if (draft == Draft.DRAFT75
+                &&h.length>=4 
+                && h[h.length-4] == CR
+                && h[h.length-3] == LF
+                && h[h.length-2] == CR
+                && h[h.length-1] == LF) {
+            
+            ClientServerType type = (wstype == ClientServerType.CLIENT) ? ClientServerType.SERVER : ClientServerType.CLIENT;
+            handshake = new WebSocketHandshake(h, type, draft);
+            completeHandshake(handshake);
+            return;
+            
+        }
         
-        byte[] h = this.remoteHandshake.array();
-        if ((h.length>=4 && h[h.length-4] == CR
-                         && h[h.length-3] == LF
-                         && h[h.length-2] == CR
-                         && h[h.length-1] == LF) ||
-            (h.length>=12 && h[h.length-12] == CR
-                         && h[h.length-11] == LF
-                         && h[h.length-10] == CR
-                         && h[h.length-9] == LF) ||
-            (h.length==23 && h[h.length-1] == 0)) {
-            completeHandshake();
+        if (draft == Draft.DRAFT76
+                && wstype == ClientServerType.SERVER
+                && h.length>=12 
+                && h[h.length-12] == CR                         
+                && h[h.length-11] == LF
+                && h[h.length-10] == CR
+                && h[h.length-9] == LF) {
+            
+            handshake = new WebSocketHandshake(h, ClientServerType.CLIENT, draft);
+            completeHandshake(handshake);
+            return;
+            
+        }
+        
+        if (draft == Draft.DRAFT76
+                && wstype == ClientServerType.CLIENT
+                && h.length>=20
+                && h[h.length-20] == CR                         
+                && h[h.length-19] == LF
+                && h[h.length-18] == CR
+                && h[h.length-17] == LF) {
+            
+            handshake = new WebSocketHandshake(h, ClientServerType.SERVER, draft);
+            completeHandshake(handshake);
+            return;            
         }
     }
 
-    private void completeHandshake() throws IOException {
-        String handshake = new String(this.remoteHandshake.array(), UTF8_CHARSET);
+    private void completeHandshake(WebSocketHandshake handshake) throws IOException {
         this.handshakeComplete = true;
         if (this.wsl.onHandshakeRecieved(this, handshake)) {
             this.wsl.onOpen(this);

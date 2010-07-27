@@ -44,23 +44,31 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
         // log things to socket-gateway.log in the CF log directory
         log = gatewayService.getLogger("websocket-gateway");        
         
-        int port = DEFAULT_PORT;       
+        int port = DEFAULT_PORT;
+        String origin = null;
+        String subprotocol = null;
         
         try {
             FileInputStream pFile = new FileInputStream(configpath);
             Properties p = new Properties();
             p.load(pFile);
             pFile.close();
-            port = Integer.parseInt(p.getProperty("port"));            
+            if (p.containsKey("port"))
+                port = Integer.parseInt(p.getProperty("port"));
+            if (p.containsKey("origin"))
+                origin = p.getProperty("origin");
+            if (p.containsKey("subprotocol"))
+                subprotocol = p.getProperty("subprotocol");
         } catch (IOException e) {
             // do nothing. use default value for port.
             log.warn("WebSocketGateway(" + gatewayID
                     + ") Unable to read configuration file '" + configpath
-                    + "': " + e.toString() + ".  Using default port "
-                    + DEFAULT_PORT + ".", e);
+                    + "': " + e.toString(), e);
         }
         
         setPort(port);
+        setOrigin(origin);
+        setSubProtocol(subprotocol);
         
         log.info("WebSocketGateway(" + gatewayID + ") configured on port" + port + ".");
 
@@ -225,7 +233,34 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
 
     @Override
     public void onClientClose(WebSocket conn) {
-        // TODO Auto-generated method stub
+     // Get a key for the connection
+        String theKey = getUniqueKey(conn);
+        
+        for (String path : cfcListeners) {
+            
+            CFEvent event = new CFEvent(gatewayID);
+
+            Hashtable<String, Object> mydata = new Hashtable<String, Object>();
+            mydata.put("CONN", conn);
+            
+            event.setData(mydata);
+            event.setGatewayType("WebSocket");
+            event.setOriginatorID(theKey);
+            event.setCfcMethod("onClientClose");
+            event.setCfcTimeOut(10);
+            if (path != null) {
+                event.setCfcPath(path);
+            }
+
+            boolean sent = gatewayService.addEvent(event);
+            if (!sent) {
+                log
+                .error("SocketGateway("
+                        + gatewayID
+                        + ") Unable to put message on event queue. Message not sent from "
+                        + gatewayID + ", thread " + theKey + ".");
+            }
+        }
 
     }
 
@@ -238,12 +273,13 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
             
             CFEvent event = new CFEvent(gatewayID);
 
-            Hashtable<String, String> mydata = new Hashtable<String, String>();
+            Hashtable<String, Object> mydata = new Hashtable<String, Object>();
             mydata.put("MESSAGE", message);
+            mydata.put("CONN", conn);
+            
             event.setData(mydata);
             event.setGatewayType("WebSocket");
             event.setOriginatorID(theKey);
-
             event.setCfcMethod(cfcEntryPoint);
             event.setCfcTimeOut(10);
             if (path != null) {
@@ -265,7 +301,34 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
 
     @Override
     public void onClientOpen(WebSocket conn) {
-        // TODO Auto-generated method stub
+        // Get a key for the connection
+        String theKey = getUniqueKey(conn);
+        
+        for (String path : cfcListeners) {
+            
+            CFEvent event = new CFEvent(gatewayID);
+
+            Hashtable<String, Object> mydata = new Hashtable<String, Object>();
+            mydata.put("CONN", conn);
+            
+            event.setData(mydata);
+            event.setGatewayType("WebSocket");
+            event.setOriginatorID(theKey);
+            event.setCfcMethod("onClientOpen");
+            event.setCfcTimeOut(10);
+            if (path != null) {
+                event.setCfcPath(path);
+            }
+
+            boolean sent = gatewayService.addEvent(event);
+            if (!sent) {
+                log
+                .error("SocketGateway("
+                        + gatewayID
+                        + ") Unable to put message on event queue. Message not sent from "
+                        + gatewayID + ", thread " + theKey + ".");
+            }
+        }
     }
 
     /**
