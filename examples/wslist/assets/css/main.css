@@ -1,0 +1,10 @@
+body{ font: 85% "Trebuchet MS", Tahoma, Verdana, Arial, sans-serif; margin: 50px; }
+
+.formButtons { margin: 10px; }
+
+legend { font-size: 150%; font-weight: bold; }
+
+fieldset { border: 1px solid #CCCCCC; }
+
+input { border: 1px solid #CCCCCC; padding: 4px; margin: 2px; }
+	
