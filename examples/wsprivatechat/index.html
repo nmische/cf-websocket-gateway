@@ -1,0 +1,162 @@
+<html>	
+	<head>		
+		<title>CF Websocket Chat</title>
+		<script type="text/javascript" src="jquery-1.4.2.min.js"></script>
+		<script type="text/javascript" src="json2.js"></script>
+		
+		<script language="JavaScript">
+	
+		var WebSocketDemo = function () {
+	
+			var username;
+			var ws;
+			// Set URL of your WebSocketMain.swf here:
+	    	WEB_SOCKET_SWF_LOCATION = "WebSocketMain.swf";
+	    	// Set this to dump debug message from Flash to console.log:
+	    	WEB_SOCKET_DEBUG = true;		
+	
+			return {		
+				init: function(u) {
+					username = u;
+					// host name and port should match server (see websocket.cfg for port number)
+					ws = new WebSocket("ws://localhost:1229");
+					ws.onopen = function() {
+						// disable connect and enable send						
+						$("#username").attr("disabled",true);
+						$("#connect").attr("disabled",true);
+						$("#message").removeAttr("disabled");
+						$("#send").removeAttr("disabled");
+						$("#chat").removeAttr("disabled");
+						
+						WebSocketDemo.sendMessage("connect",username);
+															
+					}
+					ws.onmessage = function(e) {				
+						// post message to textarea				
+						data = JSON.parse(e.data);
+												
+						switch(data.msgType) {
+							case "connect":
+								var msg = data.username + " joined the chat.\n";
+							    // get users
+								WebSocketDemo.sendMessage("userlist");
+								break;
+								
+							case "disconnect":
+								var msg = data.username + " left the chat.\n";
+								// get users
+								WebSocketDemo.sendMessage("userlist");
+								break;
+								
+							case "public":
+								var msg = data.username + ": " + data.msg + "\n";
+								break;
+								
+							case "private":
+								var msg = "[" + data.username + ": " + data.msg + "]\n";
+								break;
+								
+							case "userlist":
+								// update the user list
+								var userObj = data.msg;
+								var output = [];
+								output.push('<option value="">Everyone</option>')
+								for (var key in userObj) {
+									output.push('<option value="'+ key +'">'+ userObj[key] +'</option>');
+								}
+								$("#user").html(output.join(''));
+								break;
+								
+						}
+						
+						if (msg)
+							$("#chat").append(msg);
+							
+						if (data.username == username)
+							$("#message").val("");
+					
+			            
+					}
+					ws.onclose = function() {
+						// do nothing
+					}			
+				},
+				sendMessage: function(msgType, msg, destinationWebSocketID) {
+					var message = {
+	                    msgType : msgType,
+						username : username
+					};		
+					if(msg) {
+						message.msg = msg;
+					}	
+					if(destinationWebSocketID)	{
+						message.destinationWebSocketID = destinationWebSocketID;
+					}	
+					if(ws) {
+						ws.send(JSON.stringify(message));
+					}
+				}
+			}
+	
+		}();
+		
+	
+		$(function() {
+			
+			// if we don't have native WebSocket support, use Flash
+			if (!window.WebSocket) {				
+	                var head = $("head");				
+					head.append('<script type="text/javascript" src="swfobject.js"><\/script>');
+					head.append('<script type="text/javascript" src="FABridge.js"><\/script>');
+					head.append('<script type="text/javascript" src="web_socket.js"><\/script>');			
+	        }			
+			
+			$("#connect").click(function(event){				
+				var usr = $("#username").val();				
+				// set up our WebSocket connection
+				WebSocketDemo.init(usr);				
+			});
+			
+			$("#send").click(function(){
+				var wsID = $("#user").val();
+				var msg = $("#message").val();
+				if (wsID == "") {
+					WebSocketDemo.sendMessage("public",msg);
+				} else {
+					WebSocketDemo.sendMessage("private",msg,wsID);
+				}				
+			});			
+			
+		});
+	</script>
+	
+	<style>
+		.chatinput{ width: 400px}		
+	</style>		
+		
+	</head>
+	<body>
+		
+		<h1>CF Websocket Chat</h1>		
+		
+		<form>
+			<label for="username">Username:</label><br/>
+			<input type="text" name="username" id="username" class="chatinput"/>
+			<button type="button" name="connect" id="connect">Connect</button>
+			<br/>
+			<hr/>
+			<textarea name="chat" id="chat" disabled="true" rows="20" class="chatinput"></textarea><br/>
+			Send To:
+			<select name="user" id="user">
+				<option value="">Everyone</option>
+			</select>
+			<br/>
+			<input type="text" name="message" id="message" class="chatinput" disabled="true"/>
+			<button type="button" name="send" id="send" disabled="true">Send</button>
+			<br/>
+					
+		</form>
+		
+	</body>
+	
+</html>
