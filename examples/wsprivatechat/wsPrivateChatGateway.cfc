@@ -120,9 +120,7 @@
 		<cfif StructKeyExists(arguments,"destinationWebSocketIDs")>
 			<cfset m["DESTINATIONWEBSOCKETIDS"] = arguments.destinationWebSocketIDs />
 		</cfif>
-		
-		<cfdump var="#m#" output="console" />
-		
+			
 		<cfreturn m/>
 		
 	</cffunction>
