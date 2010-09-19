@@ -2,13 +2,14 @@
     <property name="java.home" value="env.JAVA_HOME"/>
     <property name="cf.home" value="/Applications/Jrun4/servers/cfusion/cfusion-ear/cfusion-war/WEB-INF/cfusion"/>
     <property name="cfusionjar" value="${cf.home}/lib/cfusion.jar"/>
-
+	<property file="version.properties"/>
+	
     <target name="make" depends="clean,compile,jar" description="The default: build everything"/>
 
     <target name="install" depends="make,remove-files,copy-files" description="Builds everything and copies files to ColdFuison."/>
 
     <target name="jar" description="Create the jar file.">
-        <jar destfile="${basedir}/bin/${ant.project.name}.jar">
+        <jar destfile="${basedir}/bin/${ant.project.name}-${version}.jar">
             <fileset dir="${basedir}/bin"/>
         </jar>
     </target>
@@ -28,7 +29,7 @@
     </target>
 
     <target name="copy-files" description="Removes the files from the ColdFusion server.">
-        <copy file="${basedir}/bin/${ant.project.name}.jar" todir="${cf.home}/gateway/lib"/>
+        <copy file="${basedir}/bin/${ant.project.name}-${version}.jar" todir="${cf.home}/gateway/lib"/>
         <copy file="${basedir}/config/websocket.cfg" todir="${cf.home}/gateway/config"/>
     </target>
 
