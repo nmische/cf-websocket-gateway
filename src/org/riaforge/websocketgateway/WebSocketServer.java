@@ -231,6 +231,31 @@ public abstract class WebSocketServer implements Runnable, WebSocketListener {
             ws.close();
         this.server.close();
     }
+    
+    /**
+     * Sends <var>text</var> to connected WebSocket client 
+     * specified by <var>connection</var>.
+     * @param connection The {@link WebSocket} connection to send to.
+     * @param text The String to send to <var>connection</var>.
+     * @throws IOException When socket related I/O errors occur.
+     */
+    public void sendTo(WebSocket connection, String text) throws IOException {
+        if (connection == null) throw new NullPointerException("'connection' cannot be null");
+        connection.send(text);
+    }
+    
+    /**
+     * Sends <var>text</var> to all currently connected WebSocket clients
+     * found in the Set <var>connections</var>.
+     * @param connections
+     * @param text
+     * @throws IOException When socket related I/O errors occur.
+     */
+    public void sendTo(Set<WebSocket> connections, String text) throws IOException {
+        if (connections == null) throw new NullPointerException("'connections' cannot be null");
+        for (WebSocket c : connections)
+            c.send(text);
+    }
 
     /**
      * Sends <var>text</var> to all currently connected WebSocket clients.

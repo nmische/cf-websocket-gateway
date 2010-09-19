@@ -2,6 +2,7 @@ package org.riaforge.websocketgateway;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Properties;
@@ -12,6 +13,7 @@ import coldfusion.eventgateway.Gateway;
 import coldfusion.eventgateway.GatewayHelper;
 import coldfusion.eventgateway.GatewayServices;
 import coldfusion.eventgateway.Logger;
+import coldfusion.runtime.Array;
 
 public class WebSocketGateway extends WebSocketServer implements Gateway {
 
@@ -26,6 +28,9 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
 
     // The default function to pass our events to
     protected String cfcEntryPoint = "onIncomingMessage";
+    
+    // A collection of connected clients
+    private Hashtable<String, WebSocket> connectionRegistry = new Hashtable<String, WebSocket>();
 
     // Out status
     protected int status = STOPPED;
@@ -99,17 +104,58 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
 
         // You can get named values from this map as set by the CFML CFC code
         // You should not assume String data unless you check.
-        Object value = data.get("MESSAGE");
+        Object value = data.get("MESSAGE");        
 
         if (value != null) {
             // Play it safe and convert message to a String
             // TODO: convert value to JSON
             String message = value.toString();
+            
+            String theKey = (String) data.get("DESTINATIONWEBSOCKETID");
+            WebSocket conn = null;
+            if (theKey != null) {
+                conn = connectionRegistry.get(theKey);
+                if (conn != null) {
+                    try {
+                        sendTo(conn,message);
+                        //System.out.println("message sent to one client");
+                    } catch (IOException e) {
+                        return e.getMessage();
+                    }
+                }
+                return "OK";                
+            }
+            
+            Array keys = (Array) data.get("DESTINATIONWEBSOCKETIDS");
+            HashSet<WebSocket> conns = null;
+            if(keys != null) {
+                conns = new HashSet<WebSocket>(keys.size());
+                for (int i = 0; i < keys.size(); i++)
+                {
+                    WebSocket c = connectionRegistry.get(keys.get(i));
+                    if (c != null) {
+                        conns.add(c);
+                    }
+                }
+                
+                if (conns != null && conns.size() > 0) {
+                    try {
+                        sendTo(conns,message);
+                        //System.out.println("message sent to " + conns.size() + " clients");
+                    } catch (IOException e) {
+                        return e.getMessage();
+                    }                
+                }
+                return "OK";                
+            }            
+                        
             try {
                 sendToAll(message);
+                //System.out.println("message sent to all clients");
             } catch (IOException e) {
-                // do nothing for now
-            }
+                return e.getMessage();
+            }            
+            
         }
 
         // Return a String, possibly a messageID number or error string.
@@ -235,6 +281,7 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
     public void onClientClose(WebSocket conn) {
      // Get a key for the connection
         String theKey = getUniqueKey(conn);
+        connectionRegistry.remove(theKey);
         
         for (String path : cfcListeners) {
             
@@ -272,7 +319,7 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
         for (String path : cfcListeners) {
             
             CFEvent event = new CFEvent(gatewayID);
-
+            
             Hashtable<String, Object> mydata = new Hashtable<String, Object>();
             mydata.put("MESSAGE", message);
             mydata.put("CONN", conn);
@@ -303,6 +350,7 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
     public void onClientOpen(WebSocket conn) {
         // Get a key for the connection
         String theKey = getUniqueKey(conn);
+        connectionRegistry.put(theKey, conn);
         
         for (String path : cfcListeners) {
             
