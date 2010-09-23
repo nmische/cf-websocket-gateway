@@ -7,13 +7,14 @@ import java.util.Hashtable;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
-
 import coldfusion.eventgateway.CFEvent;
 import coldfusion.eventgateway.Gateway;
 import coldfusion.eventgateway.GatewayHelper;
 import coldfusion.eventgateway.GatewayServices;
 import coldfusion.eventgateway.Logger;
 import coldfusion.runtime.Array;
+
+import net.tootallnate.websocket.*;
 
 public class WebSocketGateway extends WebSocketServer implements Gateway {
 
