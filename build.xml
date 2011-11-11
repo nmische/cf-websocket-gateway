@@ -20,17 +20,31 @@
 
     <target name="compile" description="Compile the java classes.">
         <mkdir dir="${basedir}/bin"/>
-        <javac srcdir="${basedir}/src" destdir="${basedir}/bin" fork="true" classpath="${cfusionjar}"/>
+        <javac srcdir="${basedir}/src" destdir="${basedir}/bin" fork="true">
+        	<classpath>
+        		<pathelement location="${cfusionjar}"/>
+        		<fileset dir="${basedir}/lib">
+        			<include name="**/*.jar"/>
+				</fileset>
+        	</classpath>
+        </javac>
     </target>
 
     <target name="remove-files" description="Removes the files from the ColdFusion server.">
         <delete file="${cf.home}/gateway/lib/${ant.project.name}.jar" />
         <delete file="${cf.home}/gateway/config/websocket.cfg" />
+    	<delete file="${cf.home}/gateway/lib/netty-3.2.6.Final.jar" />
+        <delete file="${cf.home}/gateway/lib/webbit-0.2.14.jar" />
     </target>
 
     <target name="copy-files" description="Removes the files from the ColdFusion server.">
         <copy file="${basedir}/bin/${ant.project.name}-${version}.jar" todir="${cf.home}/gateway/lib"/>
         <copy file="${basedir}/config/websocket.cfg" todir="${cf.home}/gateway/config"/>
+    	<copy todir="${cf.home}/gateway/lib">
+    		<fileset dir="${basedir}/lib">
+    			<include name="**/*.jar"/>
+    		</fileset>
+    	</copy>
     </target>
 
 </project>
