@@ -22,8 +22,8 @@ import coldfusion.runtime.Array;
 import static org.webbitserver.WebServers.createWebServer;
 
 public class WebSocketGateway implements Gateway, WebSocketHandler {
-	
-	// The handle to the CF gateway service
+
+    // The handle to the CF gateway service
     protected GatewayServices gatewayService;
 
     // ID provided by EventService
@@ -34,31 +34,31 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
 
     // The default function to pass our events to
     protected String cfcEntryPoint = "onIncomingMessage";
-    
+
     // A collection of connected clients
     private Hashtable<String, WebSocketConnection> connectionRegistry = new Hashtable<String, WebSocketConnection>();
 
     // The thread that is running the webbit webserver
     protected Thread clientThread;
-    
+
     // Current status
     protected int status = STOPPED;
-        
+
     // A logger
     protected Logger log;
-    
+
     // The webbit webserver
     protected WebServer webServer;
-    
+
     // The webbit webserver defaults
     public static final int DEFAULT_PORT = 8080;
-    
+
     // The webbit webserver settings
     protected int port = DEFAULT_PORT; 
 
-	public WebSocketGateway(String id, String configpath) {
-		
-		gatewayID = id;
+    public WebSocketGateway(String id, String configpath) {
+        
+        gatewayID = id;
         gatewayService = GatewayServices.getGatewayServices();
         // log things to socket-gateway.log in the CF log directory
         log = gatewayService.getLogger("websocket-gateway");        
@@ -76,65 +76,60 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
                     + ") Unable to read configuration file '" + configpath
                     + "': " + e.toString(), e);
         }
-		
-	}
+        
+    }
 
-	/* Gateway */	
-	
-	@Override
-	public void start() {		
-		status = STARTING;		
-		try {
-			
-			webServer = createWebServer(port)
-	    		.add("/", this)
-	    		.start();	
-			
-		} catch(Exception e) {
-			
-			log.error("WebSocketGateway(" + gatewayID
+    /* Gateway */    
+
+    @Override
+    public void start() {
+        status = STARTING;
+        try {
+            
+            webServer = createWebServer(port)
+                .add("/", this)
+                .start();    
+            
+        } catch(Exception e) {
+            
+            log.error("WebSocketGateway(" + gatewayID
                     + ") Unable to start webbet webserver." 
                     + "': " + e.toString(), e);
-			
-		}		        
+            
+        }
         status = RUNNING;
-	}
-	
-
-	@Override
-	public void stop() {
-		status = STOPPING;
-		try {
-			
-			webServer.stop();
-			
-		} catch(Exception e) {
-			
-			log.error("WebSocketGateway(" + gatewayID
+    }
+    
+    @Override
+    public void stop() {
+        status = STOPPING;
+        try {
+            
+            webServer.stop();
+            
+        } catch(Exception e) {
+            
+            log.error("WebSocketGateway(" + gatewayID
                     + ") Unable to stop webbet webserver." 
                     + "': " + e.toString(), e);
-			
-		}
-		status = STOPPED;
-	}
-	
-	@Override
-	public void restart() {
-		stop();
-		start();
-	}
-	
-	@Override
-	public String outgoingMessage(CFEvent cfmsg) {
-		 // Get the table of data returned from the even handler
+            
+        }
+        status = STOPPED;
+    }
+    
+    @Override
+    public void restart() {
+        stop();
+        start();
+    }
+    
+    @Override
+    public String outgoingMessage(CFEvent cfmsg) {
+         // Get the table of data returned from the even handler
         Map<?, ?> data = cfmsg.getData();
-
-        // TODO: Your code here
-
-        // You can get named values from this map as set by the CFML CFC code
-        // You should not assume String data unless you check.
-        Object value = data.get("MESSAGE");        
-
+        
+        Object value = data.get("MESSAGE");
+        
         if (value != null) {
             // Play it safe and convert message to a String
             // TODO: convert value to JSON
@@ -144,10 +139,10 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
             WebSocketConnection conn = null;
             if (theKey != null) {
                 conn = connectionRegistry.get(theKey);
-                if (conn != null) {                    
-                	sendTo(conn,message);                       
+                if (conn != null) {
+                    sendTo(conn,message);
                 }
-                return "OK";                
+                return "OK";
             }
             
             Array keys = (Array) data.get("DESTINATIONWEBSOCKETIDS");
@@ -156,66 +151,65 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
                 conns = new HashSet<WebSocketConnection>(keys.size());
                 for (int i = 0; i < keys.size(); i++)
                 {
-                	WebSocketConnection c = connectionRegistry.get(keys.get(i));
+                    WebSocketConnection c = connectionRegistry.get(keys.get(i));
                     if (c != null) {
                         conns.add(c);
                     }
-                }                
-                if (conns != null && conns.size() > 0) {                    
-                	sendTo(conns,message);                                  
                 }
-                return "OK";                
-            }            
-                       
-            sendToAll(message);                
+                if (conns != null && conns.size() > 0) { 
+                    sendTo(conns,message); 
+                }
+                return "OK"; 
+            } 
+            
+            sendToAll(message); 
             
         }
-
+        
         // Return a String, possibly a messageID number or error string.
         return "OK";
-	}
-	
+    }
+    
+    @Override
+    public String getGatewayID() {
+        return gatewayID;
+    }
+    
+    @Override
+    public GatewayHelper getHelper() {
+        return null;
+    }
 
-	@Override
-	public String getGatewayID() {
-		return gatewayID;
-	}
+    @Override
+    public int getStatus() {
+        return status;
+    }
 
-	@Override
-	public GatewayHelper getHelper() {
-		return null;
-	}
-
-	@Override
-	public int getStatus() {
-		return status;
-	}
-
-	@Override
-	public void setCFCListeners(String[] listeners) {
-		for (int i = 0; i < listeners.length; i++) {
+    @Override
+    public void setCFCListeners(String[] listeners) {
+        for (int i = 0; i < listeners.length; i++) {
             cfcListeners.add(listeners[i]);
         }
-	}
+    }
 
-	@Override
-	public void setGatewayID(String id) {
-		gatewayID = id;
-	}	
-	
-	/* WebSocketHandler */	
-	
-	@Override
-	public void onClose(WebSocketConnection conn) throws Exception {
-		
-		// Get a key for the connection
+    @Override
+    public void setGatewayID(String id) {
+        gatewayID = id;
+    }    
+    
+    /* WebSocketHandler */
+    
+    @Override
+    public void onClose(WebSocketConnection conn) throws Exception {
+        
+        // Get a key for the connection
         String theKey = getUniqueKey(conn);
         connectionRegistry.remove(theKey);
         
         for (String path : cfcListeners) {
             
             CFEvent event = new CFEvent(gatewayID);
-
+            
             Hashtable<String, Object> mydata = new Hashtable<String, Object>();
             mydata.put("CONN", conn);
             
@@ -227,7 +221,7 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
             if (path != null) {
                 event.setCfcPath(path);
             }
-
+            
             boolean sent = gatewayService.addEvent(event);
             if (!sent) {
                 log
@@ -237,16 +231,16 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
                         + gatewayID + ", thread " + theKey + ".");
             }
         }
-		
+        
+        
+    }
 
-	}
-
-	@Override
-	public void onMessage(WebSocketConnection conn, String message)
-			throws Throwable {
-		// Get a key for the connection
+    @Override
+    public void onMessage(WebSocketConnection conn, String message)
+            throws Throwable {
+        // Get a key for the connection
         String theKey = getUniqueKey(conn);
-   
+        
         for (String path : cfcListeners) {
             
             CFEvent event = new CFEvent(gatewayID);
@@ -263,7 +257,7 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
             if (path != null) {
                 event.setCfcPath(path);
             }
-
+            
             boolean sent = gatewayService.addEvent(event);
             if (!sent) {
                 log
@@ -274,27 +268,27 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
                         + ".  Message was " + message);
             }
         }
+        
+    }
 
-	}
+    @Override
+    public void onMessage(WebSocketConnection conn, byte[] message)
+            throws Throwable {
+        // TODO Auto-generated method stub
+        // TODO Implement binay message handling
+    }
 
-	@Override
-	public void onMessage(WebSocketConnection conn, byte[] message)
-			throws Throwable {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void onOpen(WebSocketConnection conn) throws Exception {
-		
-		// Get a key for the connection
+    @Override
+    public void onOpen(WebSocketConnection conn) throws Exception {
+        
+        // Get a key for the connection
         String theKey = getUniqueKey(conn);
         connectionRegistry.put(theKey, conn);
         
         for (String path : cfcListeners) {
             
             CFEvent event = new CFEvent(gatewayID);
-
+            
             Hashtable<String, Object> mydata = new Hashtable<String, Object>();
             mydata.put("CONN", conn);
             
@@ -306,7 +300,7 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
             if (path != null) {
                 event.setCfcPath(path);
             }
-
+            
             boolean sent = gatewayService.addEvent(event);
             if (!sent) {
                 log
@@ -316,36 +310,35 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
                         + gatewayID + ", thread " + theKey + ".");
             }
         }
+        
+    }
 
-	}
+    @Override
+    public void onPong(WebSocketConnection conn, String message) throws Throwable {
+        // TODO Auto-generated method stub
+    }
 
-	@Override
-	public void onPong(WebSocketConnection conn, String message) throws Throwable {
-		// TODO Auto-generated method stub
+    /* Helpers */
 
-	}
-
-	/* Helpers */
-	
-	private String getUniqueKey(Object x) {
+    private String getUniqueKey(Object x) {
         Integer z = new Integer(System.identityHashCode(x));
         return z.toString();
     }
-		
-	private void sendToAll(String message) {
-		for ( WebSocketConnection conn : connectionRegistry.values() ) {
-			conn.send(message);
-		}		
-	}
 
-	private void sendTo(HashSet<WebSocketConnection> conns, String message) {
-		for ( WebSocketConnection conn : conns ) {
-			conn.send(message);
-		}		
-	}
+    private void sendToAll(String message) {
+        for ( WebSocketConnection conn : connectionRegistry.values() ) {
+            conn.send(message);
+        }        
+    }
 
-	private void sendTo(WebSocketConnection conn, String message) {
-		conn.send(message);		
-	}
+    private void sendTo(HashSet<WebSocketConnection> conns, String message) {
+        for ( WebSocketConnection conn : conns ) {
+            conn.send(message);
+        }        
+    }
+
+    private void sendTo(WebSocketConnection conn, String message) {
+        conn.send(message);
+    }
 
 }
