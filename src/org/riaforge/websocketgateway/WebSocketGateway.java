@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import net.tootallnate.websocket.*;
@@ -308,11 +309,33 @@ public class WebSocketGateway extends WebSocketServer implements Gateway {
         }
     }
 
+    @Override
+    public void onError(Throwable ex) {
+        ex.printStackTrace();
+    }
+
     /* Helpers */
 
     private String getUniqueKey(Object x) {
         Integer z = new Integer(System.identityHashCode(x));
         return z.toString();
+    }
+
+    public void sendTo(WebSocket connection, String text) throws IOException {
+        if (connection == null) {
+          throw new NullPointerException("'connection' cannot be null");
+        }
+        connection.send(text);
+    }
+    
+    public void sendTo(Set<WebSocket> connections, String text) throws IOException {
+        if (connections == null) {
+            throw new NullPointerException("'connections' cannot be null");
+        }
+        
+        for (WebSocket c : connections) {
+            c.send(text);
+        }
     }
 
 }
