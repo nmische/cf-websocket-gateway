@@ -2,9 +2,18 @@
     <property name="java.home" value="env.JAVA_HOME"/>
     <property name="cf.home" value="/Applications/Jrun4/servers/cfusion/cfusion-ear/cfusion-war/WEB-INF/cfusion"/>
     <property name="cfusionjar" value="${cf.home}/lib/cfusion.jar"/>
-	<property file="version.properties"/>
-	
-    <target name="make" depends="clean,compile,jar" description="The default: build everything"/>
+    <property file="version.properties"/>
+
+    <target name="make" depends="clean,compile,jar" description="The default: build everything."/>
+
+    <target name="make-dist" depends="clean,compile,jar" description="Packages up distro.">
+        <mkdir dir="${basedir}/dist"/>
+        <zip destfile="${basedir}/dist/${ant.project.name}-${engine}-${version}.zip">
+            <zipfileset dir="${basedir}/bin" includes="*.jar"/>
+            <zipfileset dir="${basedir}/lib" includes="*.jar"/>
+            <zipfileset dir="${basedir}" includes="LICENSE,README.md"/>
+        </zip>
+    </target>
 
     <target name="install" depends="make,remove-files,copy-files" description="Builds everything and copies files to ColdFuison."/>
 
@@ -16,35 +25,36 @@
 
     <target name="clean" description="Remove compiled classes and jar.">
         <delete dir="${basedir}/bin"/>
+        <delete dir="${basedir}/dist"/>
     </target>
 
     <target name="compile" description="Compile the java classes.">
         <mkdir dir="${basedir}/bin"/>
         <javac srcdir="${basedir}/src" destdir="${basedir}/bin" fork="true">
-        	<classpath>
-        		<pathelement location="${cfusionjar}"/>
-        		<fileset dir="${basedir}/lib">
-        			<include name="**/*.jar"/>
-				</fileset>
-        	</classpath>
+            <classpath>
+                <pathelement location="${cfusionjar}"/>
+                <fileset dir="${basedir}/lib">
+                    <include name="**/*.jar"/>
+                </fileset>
+            </classpath>
         </javac>
     </target>
 
     <target name="remove-files" description="Removes the files from the ColdFusion server.">
-        <delete file="${cf.home}/gateway/lib/${ant.project.name}.jar" />
+        <delete file="${cf.home}/gateway/lib/${ant.project.name}-${version}.jar" />
         <delete file="${cf.home}/gateway/config/websocket.cfg" />
-    	<delete file="${cf.home}/gateway/lib/netty-3.2.6.Final.jar" />
-        <delete file="${cf.home}/gateway/lib/webbit-0.2.14.jar" />
+        <delete file="${cf.home}/gateway/lib/netty-3.2.6.Final.jar" />
+        <delete file="${cf.home}/gateway/lib/webbit-0.3.0.jar" />
     </target>
 
-    <target name="copy-files" description="Removes the files from the ColdFusion server.">
+    <target name="copy-files" description="Copies the files to the ColdFusion server.">
         <copy file="${basedir}/bin/${ant.project.name}-${version}.jar" todir="${cf.home}/gateway/lib"/>
         <copy file="${basedir}/config/websocket.cfg" todir="${cf.home}/gateway/config"/>
-    	<copy todir="${cf.home}/gateway/lib">
-    		<fileset dir="${basedir}/lib">
-    			<include name="**/*.jar"/>
-    		</fileset>
-    	</copy>
+        <copy todir="${cf.home}/gateway/lib">
+            <fileset dir="${basedir}/lib">
+                <include name="**/*.jar"/>
+            </fileset>
+        </copy>
     </target>
 
 </project>
