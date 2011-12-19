@@ -26,7 +26,7 @@ This is a ColdFusion event gateway for [WebSocket](http://tools.ietf.org/html/rf
     * Configuration File: The path to the (optional) configuration file. If not provided the WebSocket server will listen on port 1225. Below is a sample configuration file.
 
 ```
-\# port - The port the WebSocket server should listen on.
+# port - The port the WebSocket server should listen on.
 port=1225
 ```
 
