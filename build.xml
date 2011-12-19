@@ -9,8 +9,9 @@
     <target name="make-dist" depends="clean,compile,jar" description="Packages up distro.">
         <mkdir dir="${basedir}/dist"/>
         <zip destfile="${basedir}/dist/${ant.project.name}-${engine}-${version}.zip">
-            <zipfileset dir="${basedir}/bin" />
-            <zipfileset dir="${basedir}/lib" />
+            <zipfileset dir="${basedir}/bin" includes="*.jar"/>
+            <zipfileset dir="${basedir}/lib" includes="*.jar"/>
+            <zipfileset dir="${basedir}" includes="LICENSE,README.md"/>
         </zip>
     </target>
 
