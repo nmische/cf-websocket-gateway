@@ -34,13 +34,13 @@
 			
 	</cffunction>
 		
-	<cffunction name="onClientOpen">
+	<cffunction name="onOpen">
 		<cfargument name="event" />		
 		<cfset var key = event.originatorID />		
 		<cfset application.userRegistry[key] = "UNREGISTERED" />	
 	</cffunction>
 	
-	<cffunction name="onClientClose">
+	<cffunction name="onClose">
 		<cfargument name="event" />
 		<cfset var key = event.originatorID />
 		<cfset var username = "" />

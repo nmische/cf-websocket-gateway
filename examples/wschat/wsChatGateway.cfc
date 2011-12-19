@@ -8,11 +8,11 @@
 		<cfreturn msg />		
 	</cffunction>
 	
-	<cffunction name="onClientOpen">
+	<cffunction name="onOpen">
 	
 	</cffunction>
 	
-	<cffunction name="onClientClose">
+	<cffunction name="onClose">
 	
 	</cffunction>
 
