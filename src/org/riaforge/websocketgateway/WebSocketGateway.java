@@ -51,7 +51,7 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
     protected WebServer webServer;
 
     // The webbit webserver defaults
-    public static final int DEFAULT_PORT = 8080;
+    public static final int DEFAULT_PORT = 1225;
 
     // The webbit webserver settings
     protected int port = DEFAULT_PORT; 
@@ -93,7 +93,7 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
         } catch(Exception e) {
             
             log.error("WebSocketGateway(" + gatewayID
-                    + ") Unable to start webbet webserver." 
+                    + ") Unable to start webbit webserver." 
                     + "': " + e.toString(), e);
             
         }
@@ -110,7 +110,7 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
         } catch(Exception e) {
             
             log.error("WebSocketGateway(" + gatewayID
-                    + ") Unable to stop webbet webserver." 
+                    + ") Unable to stop webbit webserver." 
                     + "': " + e.toString(), e);
             
         }
@@ -125,7 +125,8 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
     
     @Override
     public String outgoingMessage(CFEvent cfmsg) {
-         // Get the table of data returned from the even handler
+        
+        // Get the table of data returned from the even handler
         Map<?, ?> data = cfmsg.getData();
         
         Object value = data.get("MESSAGE");
@@ -179,19 +180,19 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
     public GatewayHelper getHelper() {
         return null;
     }
-
+    
     @Override
     public int getStatus() {
         return status;
     }
-
+    
     @Override
     public void setCFCListeners(String[] listeners) {
         for (int i = 0; i < listeners.length; i++) {
             cfcListeners.add(listeners[i]);
         }
     }
-
+    
     @Override
     public void setGatewayID(String id) {
         gatewayID = id;
@@ -232,12 +233,12 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
             }
         }
         
-        
     }
 
     @Override
     public void onMessage(WebSocketConnection conn, String message)
             throws Throwable {
+        
         // Get a key for the connection
         String theKey = getUniqueKey(conn);
         
@@ -295,7 +296,7 @@ public class WebSocketGateway implements Gateway, WebSocketHandler {
             event.setData(mydata);
             event.setGatewayType("WebSocket");
             event.setOriginatorID(theKey);
-            event.setCfcMethod("onClientOpen");
+            event.setCfcMethod("onOpen");
             event.setCfcTimeOut(10);
             if (path != null) {
                 event.setCfcPath(path);
